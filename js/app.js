@@ -1,7 +1,51 @@
 document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
+    loadLibrary(); // Загружаем библиотеку при старте
 });
 
+// ============ INDEXEDDB HELPERS ============
+const DB_NAME = 'PodcastPlayerDB';
+const STORE_NAME = 'episodes';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveEpisode(episode) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(episode);
+    await tx.done;
+}
+
+async function getAllEpisodes() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const episodes = await tx.objectStore(STORE_NAME).getAll();
+    return episodes.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+async function deleteEpisode(id) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(id);
+    await tx.done;
+}
+
+async function getEpisode(id) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    return await tx.objectStore(STORE_NAME).get(id);
+}
+
+// ============ EVENT LISTENERS ============
 function initEventListeners() {
     // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -161,7 +205,7 @@ function renderVoiceRowsModal() {
         });
         voiceSelect.addEventListener('change', () => {
             S.voiceMap[sp.id].voice = voiceSelect.value;
-            invalidateCacheForSpeaker(sp.id); // ← инвалидация кэша при смене голоса
+            invalidateCacheForSpeaker(sp.id);
         });
 
         const emotionSelect = row.querySelector(`#emotion_${sp.id}`);
@@ -174,7 +218,7 @@ function renderVoiceRowsModal() {
         });
         emotionSelect.addEventListener('change', () => {
             S.voiceMap[sp.id].emotion = emotionSelect.value;
-            invalidateCacheForSpeaker(sp.id); // ← инвалидация кэша при смене эмоции
+            invalidateCacheForSpeaker(sp.id);
         });
 
         box.appendChild(row);
@@ -448,7 +492,100 @@ function copyPrompt() {
         .catch(() => toast('Ошибка копирования'));
 }
 
-// ============ MP3 EXPORT ============
+// ============ LIBRARY (INDEXEDDB) ============
+async function loadLibrary() {
+    try {
+        const episodes = await getAllEpisodes();
+        renderLibrary(episodes);
+    } catch (err) {
+        console.error('Ошибка загрузки библиотеки:', err);
+    }
+}
+
+function renderLibrary(episodes) {
+    const container = $('libraryContainer');
+    if (!container) return;
+
+    if (episodes.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Библиотека пуста. Сгенерируйте первый подкаст!</p></div>';
+        return;
+    }
+
+    container.innerHTML = episodes.map(ep => `
+        <div class="library-item" data-id="${ep.id}">
+            <div class="library-info">
+                <div class="library-title">${ep.title}</div>
+                <div class="library-meta">
+                    <span>${formatDuration(ep.durationSec)}</span>
+                    <span>${formatBytes(ep.blob.size)}</span>
+                    <span>${new Date(ep.createdAt).toLocaleDateString('ru-RU')}</span>
+                </div>
+            </div>
+            <div class="library-actions">
+                <button class="btn btn-small btn-primary" onclick="playFromLibrary('${ep.id}')">▶ Слушать</button>
+                <button class="btn btn-small btn-secondary" onclick="downloadFromLibrary('${ep.id}')">💾 Скачать</button>
+                <button class="btn btn-small btn-secondary" onclick="deleteFromLibrary('${ep.id}')">🗑 Удалить</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function formatDuration(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
+async function playFromLibrary(id) {
+    const episode = await getEpisode(id);
+    if (!episode) {
+        toast('Эпизод не найден');
+        return;
+    }
+
+    // Загружаем подкаст в плеер
+    loadPodcast(episode.podcastData);
+    showLoadedState(`Библиотека: ${episode.title}`);
+
+    // Начинаем воспроизведение с первого эпизода
+    S.idx = 0;
+    S.audioCache[0] = episode.blob; // Кэшируем первый Blob
+    play();
+
+    toast(`▶ Воспроизведение: ${episode.title}`);
+}
+
+async function downloadFromLibrary(id) {
+    const episode = await getEpisode(id);
+    if (!episode) {
+        toast('Эпизод не найден');
+        return;
+    }
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(episode.blob);
+    a.download = episode.title + '.mp3';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+
+    toast(`💾 Скачано: ${episode.title}.mp3`);
+}
+
+async function deleteFromLibrary(id) {
+    if (!confirm('Удалить этот подкаст из библиотеки?')) return;
+
+    await deleteEpisode(id);
+    await loadLibrary();
+    toast('🗑 Подкаст удалён из библиотеки');
+}
+
+// ============ MP3 EXPORT WITH AUTO-SAVE ============
 async function loadLame() {
     if (window.lamejs && window.lamejs.Mp3Encoder) return true;
     const cdns = [
@@ -573,6 +710,7 @@ async function exportMp3() {
             .replace(/\s+/g, '_') || 'podcast';
         const fname = `${title}.${ext}`;
 
+        // Скачиваем файл
         const a = document.createElement('a');
         a.href = URL.createObjectURL(outBlob);
         a.download = fname;
@@ -583,6 +721,22 @@ async function exportMp3() {
         setStatus(`Экспорт завершён: ${fname} (${mb} МБ)`, 'ok');
         $('exportStatus').textContent = `✅ Сохранено: ${fname} (${mb} МБ)`;
         toast('✅ Подкаст сохранён: ' + fname);
+
+        // Автоматически сохраняем в библиотеку
+        const episodeId = `ep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const episode = {
+            id: episodeId,
+            title: S.podcast.title || 'Без названия',
+            blob: outBlob,
+            durationSec: Math.round(sr * pcmChunks.reduce((s, c) => s + c.length, 0) / sr),
+            createdAt: Date.now(),
+            podcastData: S.podcast // Сохраняем JSON для возможности переиграть
+        };
+
+        await saveEpisode(episode);
+        await loadLibrary(); // Обновляем список
+        toast('📚 Добавлено в библиотеку');
+
     } catch (err) {
         setStatus('Ошибка экспорта: ' + err.message, 'error');
         toast('Ошибка экспорта: ' + err.message);

@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
-    loadLibrary(); // Загружаем библиотеку при старте
+    loadLibrary();
 });
 
 // ============ INDEXEDDB HELPERS ============
@@ -32,27 +32,23 @@ async function getAllEpisodes() {
             const request = tx.objectStore(STORE_NAME).getAll();
             
             request.onsuccess = () => {
-                // Жёсткая гарантия: если это не массив, делаем его пустым массивом
                 let episodes = request.result;
                 if (!Array.isArray(episodes)) {
                     console.warn('IndexedDB вернул не массив, используем []');
                     episodes = [];
                 }
-                
                 try {
-                    // Сортируем: новые сверху
                     episodes.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
                 } catch (e) {
                     console.error('Ошибка сортировки эпизодов:', e);
                     episodes = [];
                 }
-                
                 resolve(episodes);
             };
             
             request.onerror = () => {
                 console.error('Ошибка запроса к IndexedDB:', request.error);
-                resolve([]); // В случае ошибки возвращаем пустой массив, чтобы интерфейс не падал
+                resolve([]);
             };
         }).catch(err => {
             console.error('Ошибка открытия базы данных:', err);
@@ -270,6 +266,7 @@ function invalidateCacheForSpeaker(speakerId) {
 
 function renderTranscript() {
     const list = $('transcriptList');
+    if (!list) return;
     list.innerHTML = '';
     let idx = 0;
 
@@ -434,18 +431,32 @@ async function synthesize(text, voice, emotion, speed) {
     return await r.blob();
 }
 
-// ============ UI UPDATES ============
+// ============ UI UPDATES (ИСПРАВЛЕННАЯ ВЕРСИЯ) ============
 function displayLine() {
     if (S.idx < 0 || S.idx >= S.lines.length) return;
+    
     const line = S.lines[S.idx];
     const spIdx = getSpkIndex(line.speaker);
 
-    $('curName').textContent = `Голос ${spIdx + 1}`;
-    $('curName').className = 'speaker-name';
-    $('curAvatar').className = `avatar speaker-${spIdx + 1}`;
-    $('curAvatar').textContent = spIdx + 1;
-    $('curText').textContent = line.text;
-    $('curSeg').textContent = `Сегмент ${line.segmentId}: ${line.segmentTitle}`;
+    const curNameEl = $('curName');
+    const curAvatarEl = $('curAvatar');
+    const curTextEl = $('curText');
+    const curSegEl = $('curSeg');
+
+    if (curNameEl) {
+        curNameEl.textContent = `Голос ${spIdx + 1}`;
+        curNameEl.className = 'speaker-name';
+    }
+    if (curAvatarEl) {
+        curAvatarEl.className = `avatar speaker-${spIdx + 1}`;
+        curAvatarEl.textContent = spIdx + 1;
+    }
+    if (curTextEl) {
+        curTextEl.textContent = line.text;
+    }
+    if (curSegEl) {
+        curSegEl.textContent = `Сегмент ${line.segmentId}: ${line.segmentTitle}`;
+    }
 
     updateProgress();
     highlightTranscript();
@@ -465,10 +476,17 @@ function updateProgress() {
 }
 
 function highlightTranscript() {
-    document.querySelectorAll('.transcript-item').forEach((el, i) => {
-        el.classList.toggle('active', i === S.idx);
-        el.classList.toggle('played', i < S.idx);
-        if (i === S.idx) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const items = document.querySelectorAll('.transcript-item');
+    items.forEach((el, i) => {
+        el.classList.remove('active', 'played');
+        if (i < S.idx) {
+            el.classList.add('played');
+        } else if (i === S.idx) {
+            el.classList.add('active');
+            if (!$('transcriptList').classList.contains('hidden')) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
     });
 }
 
@@ -504,8 +522,20 @@ function closeSettingsModal() { $('settingsModal').classList.add('hidden'); }
 function toggleTranscript() {
     const list = $('transcriptList');
     const btn = $('transcriptToggle');
-    list.classList.toggle('hidden');
-    btn.textContent = list.classList.contains('hidden') ? 'Показать транскрипт' : 'Скрыть транскрипт';
+    
+    if (list.classList.contains('hidden')) {
+        list.classList.remove('hidden');
+        btn.innerHTML = 'Скрыть транскрипт ▲';
+        setTimeout(() => {
+            const activeItem = list.querySelector('.transcript-item.active');
+            if (activeItem) {
+                activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 50);
+    } else {
+        list.classList.add('hidden');
+        btn.innerHTML = 'Показать весь транскрипт ▼';
+    }
 }
 
 function scrollToSection(id) {
@@ -583,13 +613,11 @@ async function playFromLibrary(id) {
         return;
     }
 
-    // Загружаем подкаст в плеер
     loadPodcast(episode.podcastData);
     showLoadedState(`Библиотека: ${episode.title}`);
 
-    // Начинаем воспроизведение с первого эпизода
     S.idx = 0;
-    S.audioCache[0] = episode.blob; // Кэшируем первый Blob
+    S.audioCache[0] = episode.blob;
     play();
 
     toast(`▶ Воспроизведение: ${episode.title}`);
@@ -744,7 +772,6 @@ async function exportMp3() {
             .replace(/\s+/g, '_') || 'podcast';
         const fname = `${title}.${ext}`;
 
-        // Скачиваем файл
         const a = document.createElement('a');
         a.href = URL.createObjectURL(outBlob);
         a.download = fname;
@@ -762,13 +789,13 @@ async function exportMp3() {
             id: episodeId,
             title: S.podcast.title || 'Без названия',
             blob: outBlob,
-            durationSec: Math.round(sr * pcmChunks.reduce((s, c) => s + c.length, 0) / sr),
+            durationSec: Math.round(pcmChunks.reduce((s, c) => s + c.length, 0) / sr),
             createdAt: Date.now(),
-            podcastData: S.podcast // Сохраняем JSON для возможности переиграть
+            podcastData: S.podcast
         };
 
         await saveEpisode(episode);
-        await loadLibrary(); // Обновляем список
+        await loadLibrary();
         toast('📚 Добавлено в библиотеку');
 
     } catch (err) {

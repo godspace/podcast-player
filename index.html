@@ -36,6 +36,7 @@
     <!-- /Yandex.Metrika counter -->
     
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -76,19 +77,22 @@
                     <div class="upload-zone" id="dropzone">
                         <div class="upload-icon">📄</div>
                         <h3>Перетащите <strong>JSON</strong> файл сюда</h3>
-                        <p>Формат: <code>.json</code> или кликните для выбора</p>
+                        <p>или кликните для выбора</p>
                         <input type="file" id="jsonFile" accept=".json,application/json" hidden>
                     </div>
                 </div>
 
                 <div id="tab-text" class="tab-content">
-                    <textarea id="jsonText" class="json-textarea" placeholder='Вставьте сюда JSON ответ от LLM...'></textarea>
-                    <button class="btn btn-primary btn-block" id="btnParseText" style="margin-top: 12px;">Загрузить текст</button>
+                    <textarea id="jsonText" class="json-textarea" placeholder='Вставьте сюда JSON, который сгенерировала LLM на основе вашего чата...'></textarea>
+                    <button class="btn btn-primary btn-block" id="btnParseText" style="margin-top: 12px;">Загрузить JSON</button>
                 </div>
 
                 <div class="actions" style="margin-top: 20px;">
                     <button class="btn btn-secondary" id="btnCopyPrompt">📋 Промпт для LLM</button>
                 </div>
+                <p style="text-align: center; font-size: 0.8125rem; color: var(--text-tertiary); margin-top: 10px;">
+                    💡 Вставьте этот промпт в <b>уже существующий чат</b> с LLM, где вы обсуждали тему
+                </p>
             </section>
 
             <!-- Loaded State (Hidden by default) -->
@@ -149,21 +153,41 @@
                 </div>
             </div>
 
-            <!-- Current Line -->
-            <div class="current-line card">
-                <div class="speaker-info">
-                    <div class="avatar speaker-1" id="curAvatar">?</div>
-                    <div>
-                        <div class="speaker-name" id="curName">Нажмите ▶</div>
-                        <div class="line-text" id="curText">Загрузите сценарий для начала</div>
-                    </div>
-                </div>
-                <div class="segment-title" id="curSeg"></div>
-            </div>
-
+            <!-- Status -->
             <div class="status" id="statusBar">Готов к работе</div>
 
-            <!-- Library Section -->
+            <!-- Объединённый блок: Текущая реплика + Транскрипт -->
+            <section id="transcriptSection" class="section card">
+                <div class="section-header">
+                    <div class="section-icon">📜</div>
+                    <div>
+                        <h2>Транскрипт</h2>
+                        <p>Текущая реплика и навигация по подкасту</p>
+                    </div>
+                </div>
+
+                <!-- Всегда видимая текущая реплика -->
+                <div class="current-line-merged" id="mergedCurrentLine">
+                    <div class="speaker-info">
+                        <div class="avatar speaker-1" id="curAvatar">?</div>
+                        <div>
+                            <div class="speaker-name" id="curName">Нажмите ▶</div>
+                            <div class="line-text" id="curText">Загрузите сценарий для начала</div>
+                        </div>
+                    </div>
+                    <div class="segment-title" id="curSeg"></div>
+                </div>
+
+                <!-- Кнопка переключения -->
+                <button class="btn btn-secondary btn-block" id="transcriptToggle" style="margin-top: 16px;">
+                    Показать весь транскрипт ▼
+                </button>
+
+                <!-- Скрытый список всех реплик -->
+                <div class="transcript-list hidden" id="transcriptList"></div>
+            </section>
+
+            <!-- Библиотека (в самом низу) -->
             <section id="library" class="section card">
                 <div class="section-header">
                     <div class="section-icon">📚</div>
@@ -177,19 +201,6 @@
                         <p>Загрузка библиотеки...</p>
                     </div>
                 </div>
-            </section>
-
-            <!-- Transcript -->
-            <section class="section card">
-                <div class="section-header">
-                    <div class="section-icon">📜</div>
-                    <div>
-                        <h2>Транскрипт</h2>
-                        <p>Кликните на реплику для перехода</p>
-                    </div>
-                </div>
-                <button class="btn btn-secondary btn-block" id="transcriptToggle">Показать транскрипт</button>
-                <div class="transcript-list hidden" id="transcriptList"></div>
             </section>
         </main>
 

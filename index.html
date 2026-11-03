@@ -6,29 +6,19 @@
     
     <!-- SEO Meta Tags -->
     <title>Подкаст Плеер — Озвучка текстов голосом | Yandex TTS</title>
-    <meta name="description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit. Загрузите JSON, выберите голоса, получите MP3. Быстро, качественно, бесплатно.">
-    <meta name="keywords" content="подкаст, озвучка, текст в речь, TTS, Yandex SpeechKit, синтез речи, MP3, аудио подкаст">
-    <meta name="author" content="Podcast Player">
+    <meta name="description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit. Вставьте JSON, выберите голоса, получите MP3.">
+    <meta name="keywords" content="подкаст, озвучка, текст в речь, TTS, Yandex SpeechKit, синтез речи, MP3">
     <meta name="robots" content="index, follow">
     
-    <!-- Open Graph / Facebook / VK -->
+    <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://godspace.github.io/podcast-player/">
     <meta property="og:title" content="Подкаст Плеер — Озвучка текстов голосом">
     <meta property="og:description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit">
     <meta property="og:image" content="https://godspace.github.io/podcast-player/og-image.jpg">
     
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://godspace.github.io/podcast-player/">
-    <meta property="twitter:title" content="Подкаст Плеер — Озвучка текстов голосом">
-    <meta property="twitter:description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit">
-    <meta property="twitter:image" content="https://godspace.github.io/podcast-player/og-image.jpg">
-    
-    <!-- Canonical URL -->
+    <!-- Canonical & Favicon -->
     <link rel="canonical" href="https://godspace.github.io/podcast-player/">
-    
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
     
     <!-- Yandex.Metrika counter -->
@@ -45,25 +35,6 @@
     <noscript><div><img src="https://mc.yandex.ru/watch/114051715" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
     <!-- /Yandex.Metrika counter -->
     
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Подкаст Плеер",
-        "description": "Сервис для создания подкастов с озвучкой голосами Yandex SpeechKit",
-        "url": "https://godspace.github.io/podcast-player/",
-        "applicationCategory": "MultimediaApplication",
-        "operatingSystem": "Any",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "RUB"
-        }
-    }
-    </script>
-    
-    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -75,71 +46,62 @@
                     <span class="logo-icon">🎙️</span>
                     <div class="logo-text">
                         <h1>Подкаст Плеер</h1>
-                        <span class="tagline">Профессиональная озвучка текстов</span>
+                        <span class="tagline">Озвучка JSON-сценариев</span>
                     </div>
                 </div>
                 <nav class="nav">
-                    <button class="nav-btn" onclick="scrollToSection('upload')">Загрузить</button>
-                    <button class="nav-btn" onclick="scrollToSection('voices')">Голоса</button>
                     <button class="nav-btn" onclick="scrollToSection('player')">Плеер</button>
-                    <button class="nav-btn settings-btn" onclick="toggleSettings()" title="Настройки">⚙️</button>
+                    <button class="nav-btn settings-btn" onclick="openSettingsModal()" title="Настройки">⚙️</button>
                 </nav>
             </div>
         </header>
 
-        <!-- Main Content -->
         <main>
-            <!-- Step 1: Upload -->
-            <section id="upload" class="section card">
+            <!-- Step 1: Upload (Collapsible) -->
+            <section id="uploadSection" class="section card">
                 <div class="section-header">
                     <div class="section-icon">📂</div>
                     <div>
-                        <h2>Загрузите подкаст</h2>
-                        <p>Перетащите JSON файл или выберите вручную</p>
+                        <h2>Загрузка сценария</h2>
+                        <p>Загрузите файл или вставьте JSON текст</p>
                     </div>
                 </div>
                 
-                <div class="upload-zone" id="dropzone">
-                    <div class="upload-icon">📄</div>
-                    <h3>Перетащите файл сюда</h3>
-                    <p>или кликните для выбора</p>
-                    <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="file">📁 Файл</button>
+                    <button class="tab-btn" data-tab="text">📝 Текст JSON</button>
                 </div>
-                
-                <div class="file-info" id="fileInfo" style="display: none;">
-                    <span class="file-name" id="fileName"></span>
-                    <button class="btn btn-small btn-secondary" onclick="removeFile()">Удалить</button>
+
+                <div id="tab-file" class="tab-content active">
+                    <div class="upload-zone" id="dropzone">
+                        <div class="upload-icon">📄</div>
+                        <h3>Перетащите файл сюда</h3>
+                        <p>или кликните для выбора</p>
+                        <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+                    </div>
                 </div>
-                
-                <div class="actions">
-                    <button class="btn btn-primary" id="btnCopyPrompt" onclick="copyPrompt()">
-                        📋 Промпт для LLM
-                    </button>
+
+                <div id="tab-text" class="tab-content">
+                    <textarea id="jsonText" class="json-textarea" placeholder='Вставьте сюда JSON ответ от LLM...'></textarea>
+                    <button class="btn btn-primary btn-block" id="btnParseText" style="margin-top: 12px;">Загрузить текст</button>
+                </div>
+
+                <div class="actions" style="margin-top: 20px;">
+                    <button class="btn btn-secondary" id="btnCopyPrompt">📋 Промпт для LLM</button>
                 </div>
             </section>
 
-            <!-- Step 2: Voices -->
-            <section id="voices" class="section card">
-                <div class="section-header">
-                    <div class="section-icon">🎭</div>
-                    <div>
-                        <h2>Настройте голоса</h2>
-                        <p>Выберите голос и эмоцию для каждого спикера</p>
-                    </div>
-                </div>
-                
-                <div class="info-box" style="margin-bottom: 20px;">
-                    💡 <strong>Экономия:</strong> Уже озвученные реплики берутся из кэша и не тарифицируются повторно.
-                </div>
-
-                <div id="voiceRows">
-                    <div class="empty-state">
-                        <p>Сначала загрузите JSON файл</p>
-                    </div>
+            <!-- Loaded State (Hidden by default) -->
+            <section id="loadedSection" class="card hidden">
+                <div class="loaded-banner">
+                    <span class="loaded-icon">✅</span>
+                    <span class="loaded-text" id="loadedInfo">Сценарий успешно загружен</span>
+                    <button class="btn btn-small btn-secondary" id="btnChangeSource">Изменить</button>
+                    <button class="btn btn-small btn-primary" id="btnOpenVoices">🎭 Настроить голоса</button>
                 </div>
             </section>
 
-            <!-- Step 3: Player -->
+            <!-- Step 2: Player -->
             <section id="player" class="section card">
                 <div class="section-header">
                     <div class="section-icon">▶️</div>
@@ -149,7 +111,6 @@
                     </div>
                 </div>
                 
-                <!-- Controls -->
                 <div class="player-controls">
                     <button class="control-btn" id="btnPrev" disabled title="Предыдущая">⏮</button>
                     <button class="control-btn play" id="btnPlay" disabled title="Воспроизвести">▶</button>
@@ -158,7 +119,6 @@
                     <button class="control-btn" id="btnNext" disabled title="Следующая">⏭</button>
                 </div>
                 
-                <!-- Settings -->
                 <div class="player-settings">
                     <div class="setting-item">
                         <label>Скорость</label>
@@ -172,15 +132,9 @@
                     </div>
                 </div>
                 
-                <!-- Export -->
                 <div class="export-section">
-                    <button class="btn btn-primary btn-large" id="btnExport" disabled>
-                        💾 Экспорт в MP3
-                    </button>
-                    <span class="export-status" id="exportStatus">Экспорт недоступен</span>
-                </div>
-                <div class="info-box" style="margin-top: 16px;">
-                    ⏳ <strong>Экспорт:</strong> Синтезирует и склеивает все реплики в один файл. Для 80 реплик это займёт 2–4 минуты. Не закрывайте вкладку.
+                    <button class="btn btn-primary btn-large" id="btnExport" disabled>💾 Экспорт в MP3</button>
+                    <span class="export-status" id="exportStatus">Ожидание загрузки</span>
                 </div>
             </section>
 
@@ -201,13 +155,12 @@
                     <div class="avatar speaker-1" id="curAvatar">?</div>
                     <div>
                         <div class="speaker-name" id="curName">Нажмите ▶</div>
-                        <div class="line-text" id="curText">Загрузите файл для начала</div>
+                        <div class="line-text" id="curText">Загрузите сценарий для начала</div>
                     </div>
                 </div>
                 <div class="segment-title" id="curSeg"></div>
             </div>
 
-            <!-- Status -->
             <div class="status" id="statusBar">Готов к работе</div>
 
             <!-- Transcript -->
@@ -219,23 +172,37 @@
                         <p>Кликните на реплику для перехода</p>
                     </div>
                 </div>
-                <button class="btn btn-secondary btn-block" id="transcriptToggle">
-                    Показать транскрипт
-                </button>
+                <button class="btn btn-secondary btn-block" id="transcriptToggle">Показать транскрипт</button>
                 <div class="transcript-list hidden" id="transcriptList"></div>
             </section>
         </main>
 
-        <!-- Settings Modal (Hidden by default) -->
+        <!-- Voice Settings Modal -->
+        <div class="modal hidden" id="voiceModal">
+            <div class="modal-content modal-medium">
+                <div class="modal-header">
+                    <h2>Настройка голосов</h2>
+                    <button class="close-btn" onclick="closeVoiceModal()">✕</button>
+                </div>
+                <div class="modal-body" id="voiceRowsModal">
+                    <!-- Generated by JS -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary btn-block" onclick="closeVoiceModal()">Сохранить и закрыть</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- General Settings Modal -->
         <div class="modal hidden" id="settingsModal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>Настройки</h2>
-                    <button class="close-btn" onclick="toggleSettings()">✕</button>
+                    <button class="close-btn" onclick="closeSettingsModal()">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>URL прокси (для разработчиков)</label>
+                        <label>URL прокси</label>
                         <input type="text" id="proxyUrl" value="https://yandex-tts-proxy.kozlov-stereo.workers.dev">
                         <small>По умолчанию используется наш прокси на Cloudflare</small>
                     </div>
@@ -247,13 +214,10 @@
             </div>
         </div>
 
-        <!-- Toast Notification -->
         <div class="toast" id="toast"></div>
     </div>
 
     <audio id="audioEl"></audio>
-    
-    <!-- Scripts -->
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
 </body>

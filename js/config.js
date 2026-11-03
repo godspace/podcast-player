@@ -1,81 +1,90 @@
 // Configuration
 const CONFIG = {
-    // Voices
-    YANDEX_VOICES: [
-        {id:'filipp',  name:'Filipp (муж)'},
-        {id:'jane',    name:'Jane (жен)'},
-        {id:'ermil',   name:'Ermil (муж)'},
-        {id:'zahar',   name:'Zahar (муж)'},
-        {id:'madirus', name:'Madirus (муж)'},
-        {id:'oksana',  name:'Oksana (жен)'},
-        {id:'alena',   name:'Alena (жен)'},
-        {id:'omazh',   name:'Omazh (жен)'}
-    ],
-    
-    DEFAULT_VOICES: ['filipp', 'jane'],
-    
-    EMOTIONS: [
-        {id:'neutral', name:'Нейтрально'},
-        {id:'good',    name:'Весело / Добро'},
-        {id:'evil',    name:'Зло / Сердито'}
-    ],
-    
-    // LLM Prompt
-    LLM_PROMPT: `Ты — профессиональный сценарист подкастов. Создай текстовый подкаст в формате JSON.
+  // Voices
+  YANDEX_VOICES: [
+      {id:'filipp',  name:'Filipp (муж)'},
+      {id:'jane',    name:'Jane (жен)'},
+      {id:'ermil',   name:'Ermil (муж)'},
+      {id:'zahar',   name:'Zahar (муж)'},
+      {id:'madirus', name:'Madirus (муж)'},
+      {id:'oksana',  name:'Oksana (жен)'},
+      {id:'alena',   name:'Alena (жен)'},
+      {id:'omazh',   name:'Omazh (жен)'}
+  ],
+  
+  DEFAULT_VOICES: ['filipp', 'jane'],
+  
+  EMOTIONS: [
+      {id:'neutral', name:'Нейтрально'},
+      {id:'good',    name:'Весело / Добро'},
+      {id:'evil',    name:'Зло / Сердито'}
+  ],
+  
+  // LLM Prompt: для финальной стадии исследования, когда контекст уже накоплен
+  LLM_PROMPT: `Ты — профессиональный сценарист подкастов. В этом чате мы уже подробно обсудили тему и накопили всю необходимую фактологическую базу.
+
+══════════════ ЗАДАЧА ══════════════
+Преврати всё обсуждение из этого чата в текстовый подкаст формата JSON для автоматической голосовой озвучки. Используй ТОЛЬКО факты и идеи, которые уже прозвучали в нашем диалоге. Не выдумывай новую информацию и не уходи в сторону.
 
 ══════════════ ТРЕБУЕМАЯ СТРУКТУРА JSON ══════════════
 {
-  "podcast": {
-    "title": "Название подкаста",
-    "subtitle": "Краткий подзаголовок",
-    "language": "ru-RU",
-    "estimated_duration_minutes": 15,
-    "speakers": [
-      { "id": "speaker_1", "name": "Первый голос" },
-      { "id": "speaker_2", "name": "Второй голос" }
-    ],
-    "segments": [
-      {
-        "segment_id": 1,
-        "title": "Название сегмента",
-        "lines": [
-          { "speaker": "speaker_1", "text": "Привет!", "emotion": "good", "pause_after_ms": 500 }
-        ]
-      }
-    ]
-  }
+"podcast": {
+  "title": "Название подкаста (отражает тему нашего обсуждения)",
+  "subtitle": "Краткий подзаголовок",
+  "language": "ru-RU",
+  "estimated_duration_minutes": 15,
+  "speakers": [
+    { "id": "speaker_1" },
+    { "id": "speaker_2" }
+  ],
+  "segments": [
+    {
+      "segment_id": 1,
+      "title": "Название сегмента",
+      "lines": [
+        { "speaker": "speaker_1", "text": "Итак, давай разберём...", "emotion": "neutral", "pause_after_ms": 500 },
+        { "speaker": "speaker_2", "text": "Согласен, и вот что важно...", "emotion": "good", "pause_after_ms": 700 }
+      ]
+    }
+  ]
+}
 }
 
 ══════════════ ПРАВИЛА ══════════════
-1. Используй РОВНО ДВУХ спикеров: "speaker_1" и "speaker_2"
-2. Поле "name" необязательно
-3. "emotion": "neutral", "good" или "evil"
-4. "pause_after_ms": 300–1200
-5. 5–10 сегментов
-6. Текст ДЛЯ ОЗВУЧКИ: без маркдауна, чисел словами
-7. 30–80 реплик
-8. Живой диалог: вопросы, реакции
+1. Используй РОВНО ДВУХ спикеров: "speaker_1" и "speaker_2". Поле "name" не нужно.
+2. В каждой реплике поле "speaker" должно точно совпадать с "speaker_1" или "speaker_2".
+3. Поле "emotion" (опционально): "neutral", "good" или "evil".
+4. Поле "pause_after_ms" (опционально): пауза после реплики в миллисекундах (300–1200).
+5. Разбей подкаст на 5–10 логических сегментов, отражающих структуру нашего обсуждения.
+6. Текст ПРЕДНАЗНАЧЕН ДЛЯ ГОЛОСОВОЙ ОЗВУЧКИ:
+ - Без маркдауна, списков, формул, кода, таблиц, ссылок.
+ - Числа, проценты и сокращения пиши словами (не "25%", а "двадцать пять процентов"; не "млн", а "миллионов").
+ - Латинские термины транслитерируй или заменяй русскими аналогами там, где это уместно для устной речи.
+7. Объём: от 30 до 80 реплик суммарно.
+8. Формат — живой диалог: вопросы, реакции, уточнения, переходы между темами. Один спикер может задавать вопросы, другой — отвечать и дополнять.
+9. Опирайся строго на материал из этого чата. Если в обсуждении были примеры, аналогии, ключевые тезисы — обязательно включи их.
 
-Тема: [УКАЖИТЕ ТЕМУ]
+══════════════ СТРУКТУРА ПОДАЧИ ══════════════
+Начни с краткого вступления (что обсуждали и зачем), затем пройди по ключевым блокам нашего диалога в логическом порядке, завершив выводом или резюме.
 
-Верни ТОЛЬКО JSON.`,
+Верни ТОЛЬКО валидный JSON без пояснений и без обёрток в тройные кавычки.`,
 
-    // Default proxy URL
-    DEFAULT_PROXY_URL: 'https://yandex-tts-proxy.kozlov-stereo.workers.dev'
+  // Default proxy URL
+  DEFAULT_PROXY_URL: 'https://yandex-tts-proxy.kozlov-stereo.workers.dev'
 };
 
 // State
 const S = {
-    podcast: null,
-    lines: [],
-    idx: -1,
-    playing: false,
-    paused: false,
-    stopRequested: false,
-    exporting: false,
-    voiceMap: {},
-    audioCache: {},
-    audioEl: document.getElementById('audioEl')
+  podcast: null,
+  lines: [],
+  idx: -1,
+  playing: false,
+  paused: false,
+  stopRequested: false,
+  exporting: false,
+  voiceMap: {},
+  audioCache: {},
+  audioEl: document.getElementById('audioEl')
 };
 
 // Helper

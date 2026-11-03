@@ -91,6 +91,7 @@ function resetUploadState() {
     S.lines = [];
     S.idx = -1;
     S.audioCache = {};
+    pendingSynthesis.clear();
     $('jsonFile').value = '';
     $('jsonText').value = '';
     $('uploadSection').classList.remove('hidden');
@@ -111,6 +112,7 @@ function loadPodcast(data) {
     S.podcast = data.podcast || data;
     S.lines = [];
     S.audioCache = {};
+    pendingSynthesis.clear();
     S.idx = -1;
 
     (S.podcast.segments || []).forEach(seg => {
@@ -157,7 +159,10 @@ function renderVoiceRowsModal() {
             if (v.id === S.voiceMap[sp.id].voice) option.selected = true;
             voiceSelect.appendChild(option);
         });
-        voiceSelect.addEventListener('change', () => { S.voiceMap[sp.id].voice = voiceSelect.value; });
+        voiceSelect.addEventListener('change', () => {
+            S.voiceMap[sp.id].voice = voiceSelect.value;
+            invalidateCacheForSpeaker(sp.id); // ← инвалидация кэша при смене голоса
+        });
 
         const emotionSelect = row.querySelector(`#emotion_${sp.id}`);
         CONFIG.EMOTIONS.forEach(em => {
@@ -167,10 +172,22 @@ function renderVoiceRowsModal() {
             if (em.id === S.voiceMap[sp.id].emotion) option.selected = true;
             emotionSelect.appendChild(option);
         });
-        emotionSelect.addEventListener('change', () => { S.voiceMap[sp.id].emotion = emotionSelect.value; });
+        emotionSelect.addEventListener('change', () => {
+            S.voiceMap[sp.id].emotion = emotionSelect.value;
+            invalidateCacheForSpeaker(sp.id); // ← инвалидация кэша при смене эмоции
+        });
 
         box.appendChild(row);
     });
+}
+
+function invalidateCacheForSpeaker(speakerId) {
+    S.lines.forEach((line, i) => {
+        if (line.speaker === speakerId) {
+            delete S.audioCache[i];
+        }
+    });
+    toast('⚠️ Кэш очищен для изменённого голоса');
 }
 
 function renderTranscript() {
@@ -204,6 +221,8 @@ function renderTranscript() {
 }
 
 // ============ PLAYBACK ============
+let lastStepTime = 0;
+
 function play() {
     if (S.exporting) { toast('Дождитесь окончания экспорта'); return; }
     if (!S.lines.length) { toast('Сначала загрузите сценарий'); return; }
@@ -235,6 +254,10 @@ function stopPlayback() {
 }
 
 function step(d) {
+    const now = Date.now();
+    if (now - lastStepTime < 300) return;
+    lastStepTime = now;
+
     const n = S.idx + d;
     if (n < 0 || n >= S.lines.length) return;
     S.audioEl.pause();
@@ -244,6 +267,8 @@ function step(d) {
 }
 
 function jumpTo(i) {
+    if (S.exporting) { toast('Дождитесь окончания экспорта'); return; }
+    if (i < 0 || i >= S.lines.length) return;
     S.audioEl.pause();
     S.idx = i;
     displayLine();
@@ -290,14 +315,27 @@ async function playCurrent() {
     }
 }
 
+// ============ SYNTHESIS WITH DEDUPLICATION ============
+const pendingSynthesis = new Map();
+
 async function ensureAudio(i) {
     if (S.audioCache[i]) return S.audioCache[i];
+    if (pendingSynthesis.has(i)) return pendingSynthesis.get(i);
+
     const line = S.lines[i];
     const map = S.voiceMap[line.speaker] || { voice: 'jane', emotion: 'neutral' };
     const speed = $('rateSlider').value;
-    const blob = await synthesize(line.text, map.voice, map.emotion, speed);
-    S.audioCache[i] = blob;
-    return blob;
+
+    const promise = synthesize(line.text, map.voice, map.emotion, speed);
+    pendingSynthesis.set(i, promise);
+
+    try {
+        const blob = await promise;
+        S.audioCache[i] = blob;
+        return blob;
+    } finally {
+        pendingSynthesis.delete(i);
+    }
 }
 
 async function synthesize(text, voice, emotion, speed) {

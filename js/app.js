@@ -30,7 +30,7 @@ async function getAllEpisodes() {
         openDB().then(db => {
             const tx = db.transaction(STORE_NAME, 'readonly');
             const request = tx.objectStore(STORE_NAME).getAll();
-            
+
             request.onsuccess = () => {
                 let episodes = request.result;
                 if (!Array.isArray(episodes)) {
@@ -45,7 +45,7 @@ async function getAllEpisodes() {
                 }
                 resolve(episodes);
             };
-            
+
             request.onerror = () => {
                 console.error('Ошибка запроса к IndexedDB:', request.error);
                 resolve([]);
@@ -95,9 +95,8 @@ function initEventListeners() {
     $('jsonFile').addEventListener('change', handleFileSelect);
     $('btnParseText').addEventListener('click', handleTextParse);
 
-    // State change
-    $('btnChangeSource').addEventListener('click', resetUploadState);
-    $('btnOpenVoices').addEventListener('click', openVoiceModal);
+    // Loaded state
+    $('btnNewPodcast').addEventListener('click', resetUploadState);
 
     // Controls
     $('btnPlay').addEventListener('click', play);
@@ -133,8 +132,7 @@ function handleTextParse() {
     if (!text) { toast('Введите JSON текст'); return; }
     try {
         loadPodcast(JSON.parse(text));
-        showLoadedState('JSON из текста');
-        // Запускаем предварительную генерацию
+        showLoadedState(S.podcast.title);
         preGeneratePodcast();
     } catch (err) {
         toast('Ошибка JSON: ' + err.message);
@@ -146,8 +144,7 @@ function readFile(file) {
     reader.onload = e => {
         try {
             loadPodcast(JSON.parse(e.target.result));
-            showLoadedState(file.name);
-            // Запускаем предварительную генерацию
+            showLoadedState(S.podcast.title);
             preGeneratePodcast();
         } catch (err) {
             toast('Ошибка JSON: ' + err.message);
@@ -156,10 +153,10 @@ function readFile(file) {
     reader.readAsText(file);
 }
 
-function showLoadedState(sourceName) {
+function showLoadedState(title) {
     $('uploadSection').classList.add('hidden');
     $('loadedSection').classList.remove('hidden');
-    $('loadedInfo').textContent = `✅ Загружено: ${sourceName}`;
+    $('loadedTitle').textContent = title || 'Без названия';
     $('exportStatus').textContent = 'Готов к экспорту';
 }
 
@@ -170,12 +167,14 @@ function resetUploadState() {
     S.lines = [];
     S.idx = -1;
     S.audioCache = {};
+    S.voiceMap = {};
+    S.currentEpisodeId = null;
     pendingSynthesis.clear();
     $('jsonFile').value = '';
     $('jsonText').value = '';
     $('uploadSection').classList.remove('hidden');
     $('loadedSection').classList.add('hidden');
-    $('voiceRowsModal').innerHTML = '<div class="empty-state"><p>Сначала загрузите сценарий</p></div>';
+    renderVoiceSettingsPlaceholder();
     updateProgress();
     $('curName').textContent = 'Нажмите ▶';
     $('curText').textContent = 'Загрузите сценарий для начала';
@@ -188,47 +187,47 @@ function resetUploadState() {
 // ============ PRE-GENERATION ============
 async function preGeneratePodcast() {
     if (!S.lines.length) return;
-    
+
     S.preGenerating = true;
     setStatus('Предварительная генерация: подготовка...', 'success');
-    
+
     try {
         const blobs = [];
-        
+
         for (let i = 0; i < S.lines.length; i++) {
             if (!S.preGenerating) {
                 setStatus('Предварительная генерация отменена', 'error');
                 return;
             }
-            
+
             setStatus(`Предварительная генерация: реплика ${i + 1}/${S.lines.length}`, 'success');
             $('exportStatus').textContent = `Генерация: ${i + 1}/${S.lines.length}`;
-            
+
             const blob = await ensureAudio(i);
             blobs.push(blob);
-            
+
             $('progressBar').style.width = ((i + 1) / S.lines.length * 100) + '%';
         }
-        
-        // Сохраняем в библиотеку
+
         const episodeId = `ep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const episode = {
             id: episodeId,
             title: S.podcast.title || 'Без названия',
-            blobs: blobs, // Массив blob'ов по репликам
-            mergedBlob: null, // Будет создан при экспорте
+            blobs: blobs,
+            mergedBlob: null,
             durationSec: 0,
             createdAt: Date.now(),
             podcastData: S.podcast
         };
-        
+
         await saveEpisode(episode);
+        S.currentEpisodeId = episodeId;
         await loadLibrary();
-        
+
         setStatus(`✅ Предварительная генерация завершена: ${S.lines.length} реплик`, 'success');
         $('exportStatus').textContent = '✅ Готов к воспроизведению и экспорту';
         toast('📚 Подкаст сохранён в библиотеку');
-        
+
     } catch (err) {
         setStatus('Ошибка предварительной генерации: ' + err.message, 'error');
         toast('Ошибка генерации: ' + err.message);
@@ -243,6 +242,8 @@ function loadPodcast(data) {
     S.podcast = data.podcast || data;
     S.lines = [];
     S.audioCache = {};
+    S.voiceMap = {};
+    S.currentEpisodeId = null;
     pendingSynthesis.clear();
     S.idx = -1;
 
@@ -252,31 +253,43 @@ function loadPodcast(data) {
         });
     });
 
-    renderVoiceRowsModal();
+    renderVoiceSettingsInModal();
     renderTranscript();
     updateProgress();
     enableControls();
 }
 
-function renderVoiceRowsModal() {
-    const box = $('voiceRowsModal');
+function renderVoiceSettingsPlaceholder() {
+    const box = $('voiceSettingsInModal');
+    if (!box) return;
+    box.innerHTML = '<p style="color: var(--text-tertiary); font-size: 0.875rem;">Загрузите подкаст, чтобы настроить голоса</p>';
+}
+
+function renderVoiceSettingsInModal() {
+    const box = $('voiceSettingsInModal');
+    if (!box) return;
     box.innerHTML = '';
 
+    if (!S.podcast || !(S.podcast.speakers || []).length) {
+        renderVoiceSettingsPlaceholder();
+        return;
+    }
+
     (S.podcast.speakers || []).forEach((sp, i) => {
-        S.voiceMap[sp.id] = {
-            voice: CONFIG.DEFAULT_VOICES[i % CONFIG.DEFAULT_VOICES.length],
-            emotion: sp.emotion || 'neutral'
-        };
+        if (!S.voiceMap[sp.id]) {
+            S.voiceMap[sp.id] = {
+                voice: CONFIG.DEFAULT_VOICES[i % CONFIG.DEFAULT_VOICES.length],
+                emotion: sp.emotion || 'neutral'
+            };
+        }
 
         const row = document.createElement('div');
-        row.className = 'voice-row-modal';
-
-        const displayName = `Голос ${i + 1}`;
+        row.className = 'voice-setting-row';
 
         row.innerHTML = `
-            <div class="voice-label-modal">
+            <div class="voice-setting-label">
                 <div class="avatar speaker-${i + 1}">${i + 1}</div>
-                <span>${displayName}</span>
+                <span>Голос ${i + 1}</span>
             </div>
             <select id="voice_${sp.id}" class="voice-select"></select>
             <select id="emotion_${sp.id}" class="emotion-select"></select>
@@ -356,9 +369,9 @@ function renderTranscript() {
 let lastStepTime = 0;
 
 function play() {
-    if (S.exporting || S.preGenerating) { 
-        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта'); 
-        return; 
+    if (S.exporting || S.preGenerating) {
+        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта');
+        return;
     }
     if (!S.lines.length) { toast('Сначала загрузите сценарий'); return; }
     if (S.paused) { S.audioEl.play(); S.paused = false; setStatus('Продолжение', 'success'); return; }
@@ -402,9 +415,9 @@ function step(d) {
 }
 
 function jumpTo(i) {
-    if (S.exporting || S.preGenerating) { 
-        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта'); 
-        return; 
+    if (S.exporting || S.preGenerating) {
+        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта');
+        return;
     }
     if (i < 0 || i >= S.lines.length) return;
     S.audioEl.pause();
@@ -496,7 +509,7 @@ async function synthesize(text, voice, emotion, speed) {
 // ============ UI UPDATES ============
 function displayLine() {
     if (S.idx < 0 || S.idx >= S.lines.length) return;
-    
+
     const line = S.lines[S.idx];
     const spIdx = getSpkIndex(line.speaker);
 
@@ -576,15 +589,13 @@ function updateVolume() { $('volVal').textContent = Math.round($('volSlider').va
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ============ MODALS & HELPERS ============
-function openVoiceModal() { $('voiceModal').classList.remove('hidden'); }
-function closeVoiceModal() { $('voiceModal').classList.add('hidden'); }
 function openSettingsModal() { $('settingsModal').classList.remove('hidden'); }
 function closeSettingsModal() { $('settingsModal').classList.add('hidden'); }
 
 function toggleTranscript() {
     const list = $('transcriptList');
     const btn = $('transcriptToggle');
-    
+
     if (list.classList.contains('hidden')) {
         list.classList.remove('hidden');
         btn.innerHTML = 'Скрыть транскрипт ▲';
@@ -638,7 +649,6 @@ function renderLibrary(episodes) {
     }
 
     container.innerHTML = episodes.map(ep => {
-        // Считаем суммарный размер всех реплик
         let totalSize = 0;
         if (ep.mergedBlob) {
             totalSize = ep.mergedBlob.size;
@@ -646,8 +656,7 @@ function renderLibrary(episodes) {
             totalSize = ep.blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
         }
 
-        // Считаем длительность (если есть)
-        const duration = ep.durationSec ? formatDuration(ep.durationSec) : '~';
+        const duration = ep.durationSec ? formatDuration(ep.durationSec) : '—';
 
         return `
             <div class="library-item" data-id="${ep.id}">
@@ -692,17 +701,17 @@ async function playFromLibrary(id) {
     }
 
     loadPodcast(episode.podcastData);
-    showLoadedState(`Библиотека: ${episode.title}`);
+    showLoadedState(episode.title);
 
-    // Кэшируем ВСЕ blob'ы из библиотеки
     if (episode.blobs && Array.isArray(episode.blobs)) {
         episode.blobs.forEach((blob, i) => {
             S.audioCache[i] = blob;
         });
     }
 
+    S.currentEpisodeId = episode.id;
     S.idx = 0;
-    displayLine(); // Обновляем транскрипт сразу
+    displayLine();
     play();
 
     toast(`▶ Воспроизведение: ${episode.title}`);
@@ -716,7 +725,7 @@ async function downloadFromLibrary(id) {
     }
 
     if (!episode.mergedBlob) {
-        toast('MP3 ещё не создан. Нажмите "Экспорт в MP3" после открытия подкаста.');
+        toast('MP3 ещё не создан. Откройте подкаст и нажмите «Экспорт в MP3».');
         return;
     }
 
@@ -733,6 +742,9 @@ async function deleteFromLibrary(id) {
     if (!confirm('Удалить этот подкаст из библиотеки?')) return;
 
     await deleteEpisode(id);
+    if (S.currentEpisodeId === id) {
+        S.currentEpisodeId = null;
+    }
     await loadLibrary();
     toast('🗑 Подкаст удалён из библиотеки');
 }
@@ -872,17 +884,16 @@ async function exportMp3() {
         $('exportStatus').textContent = `✅ ${fname} (${mb} МБ)`;
         toast('✅ Файл скачан: ' + fname);
 
-        // Обновляем запись в библиотеке: добавляем mergedBlob
-        const episodes = await getAllEpisodes();
-        const currentEpisode = episodes.find(ep => 
-            ep.podcastData && ep.podcastData.title === S.podcast.title
-        );
-        if (currentEpisode) {
-            currentEpisode.mergedBlob = outBlob;
-            currentEpisode.durationSec = Math.round(pcmChunks.reduce((s, c) => s + c.length, 0) / sr);
-            await saveEpisode(currentEpisode);
-            await loadLibrary();
-            toast('📚 Библиотека обновлена');
+        // Обновляем существующую запись в библиотеке
+        if (S.currentEpisodeId) {
+            const episode = await getEpisode(S.currentEpisodeId);
+            if (episode) {
+                episode.mergedBlob = outBlob;
+                episode.durationSec = Math.round(pcmChunks.reduce((s, c) => s + c.length, 0) / sr);
+                await saveEpisode(episode);
+                await loadLibrary();
+                toast('📚 Библиотека обновлена');
+            }
         }
 
     } catch (err) {

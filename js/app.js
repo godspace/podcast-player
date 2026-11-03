@@ -26,10 +26,39 @@ async function saveEpisode(episode) {
 }
 
 async function getAllEpisodes() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const episodes = await tx.objectStore(STORE_NAME).getAll();
-    return episodes.sort((a, b) => b.createdAt - a.createdAt);
+    return new Promise((resolve) => {
+        openDB().then(db => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const request = tx.objectStore(STORE_NAME).getAll();
+            
+            request.onsuccess = () => {
+                // Жёсткая гарантия: если это не массив, делаем его пустым массивом
+                let episodes = request.result;
+                if (!Array.isArray(episodes)) {
+                    console.warn('IndexedDB вернул не массив, используем []');
+                    episodes = [];
+                }
+                
+                try {
+                    // Сортируем: новые сверху
+                    episodes.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                } catch (e) {
+                    console.error('Ошибка сортировки эпизодов:', e);
+                    episodes = [];
+                }
+                
+                resolve(episodes);
+            };
+            
+            request.onerror = () => {
+                console.error('Ошибка запроса к IndexedDB:', request.error);
+                resolve([]); // В случае ошибки возвращаем пустой массив, чтобы интерфейс не падал
+            };
+        }).catch(err => {
+            console.error('Ошибка открытия базы данных:', err);
+            resolve([]);
+        });
+    });
 }
 
 async function deleteEpisode(id) {
@@ -40,9 +69,14 @@ async function deleteEpisode(id) {
 }
 
 async function getEpisode(id) {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    return await tx.objectStore(STORE_NAME).get(id);
+    return new Promise((resolve, reject) => {
+        openDB().then(db => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const request = tx.objectStore(STORE_NAME).get(id);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        }).catch(reject);
+    });
 }
 
 // ============ EVENT LISTENERS ============

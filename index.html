@@ -11,43 +11,39 @@
     <meta name="author" content="Podcast Player">
     <meta name="robots" content="index, follow">
     
-    <!-- Open Graph / Facebook -->
+    <!-- Open Graph / Facebook / VK -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://yourdomain.com/">
+    <meta property="og:url" content="https://godspace.github.io/podcast-player/">
     <meta property="og:title" content="Подкаст Плеер — Озвучка текстов голосом">
     <meta property="og:description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit">
-    <meta property="og:image" content="https://yourdomain.com/og-image.jpg">
+    <meta property="og:image" content="https://godspace.github.io/podcast-player/og-image.jpg">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://yourdomain.com/">
+    <meta property="twitter:url" content="https://godspace.github.io/podcast-player/">
     <meta property="twitter:title" content="Подкаст Плеер — Озвучка текстов голосом">
     <meta property="twitter:description" content="Создавайте профессиональные подкасты с озвучкой голосами Yandex SpeechKit">
-    <meta property="twitter:image" content="https://yourdomain.com/og-image.jpg">
+    <meta property="twitter:image" content="https://godspace.github.io/podcast-player/og-image.jpg">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://yourdomain.com/">
+    <link rel="canonical" href="https://godspace.github.io/podcast-player/">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>️</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
     
-    <!-- Yandex Metrika -->
-    <script type="text/javascript" >
-       (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-       m[i].l=1*new Date();
-       for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-       k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-       (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+        })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=114051715', 'ym');
 
-       ym(YOUR_COUNTER_ID, "init", {
-            clickmap:true,
-            trackLinks:true,
-            accurateTrackBounce:true,
-            webvisor:true
-       });
+        ym(114051715, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
     </script>
-    <noscript><div><img src="https://mc.yandex.ru/watch/YOUR_COUNTER_ID" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
-    <!-- /Yandex Metrika -->
+    <noscript><div><img src="https://mc.yandex.ru/watch/114051715" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
     
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
@@ -56,7 +52,7 @@
         "@type": "WebApplication",
         "name": "Подкаст Плеер",
         "description": "Сервис для создания подкастов с озвучкой голосами Yandex SpeechKit",
-        "url": "https://yourdomain.com",
+        "url": "https://godspace.github.io/podcast-player/",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Any",
         "offers": {
@@ -67,6 +63,7 @@
     }
     </script>
     
+    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -75,7 +72,7 @@
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <span class="logo-icon">️</span>
+                    <span class="logo-icon">🎙️</span>
                     <div class="logo-text">
                         <h1>Подкаст Плеер</h1>
                         <span class="tagline">Профессиональная озвучка текстов</span>
@@ -85,7 +82,7 @@
                     <button class="nav-btn" onclick="scrollToSection('upload')">Загрузить</button>
                     <button class="nav-btn" onclick="scrollToSection('voices')">Голоса</button>
                     <button class="nav-btn" onclick="scrollToSection('player')">Плеер</button>
-                    <button class="nav-btn settings-btn" onclick="toggleSettings()">⚙️</button>
+                    <button class="nav-btn settings-btn" onclick="toggleSettings()" title="Настройки">⚙️</button>
                 </nav>
             </div>
         </header>
@@ -124,13 +121,17 @@
             <!-- Step 2: Voices -->
             <section id="voices" class="section card">
                 <div class="section-header">
-                    <div class="section-icon"></div>
+                    <div class="section-icon">🎭</div>
                     <div>
                         <h2>Настройте голоса</h2>
                         <p>Выберите голос и эмоцию для каждого спикера</p>
                     </div>
                 </div>
                 
+                <div class="info-box" style="margin-bottom: 20px;">
+                    💡 <strong>Экономия:</strong> Уже озвученные реплики берутся из кэша и не тарифицируются повторно.
+                </div>
+
                 <div id="voiceRows">
                     <div class="empty-state">
                         <p>Сначала загрузите JSON файл</p>
@@ -150,11 +151,11 @@
                 
                 <!-- Controls -->
                 <div class="player-controls">
-                    <button class="control-btn" id="btnPrev" disabled>⏮</button>
-                    <button class="control-btn play" id="btnPlay" disabled>▶</button>
-                    <button class="control-btn" id="btnPause" disabled>⏸</button>
-                    <button class="control-btn" id="btnStop" disabled>⏹</button>
-                    <button class="control-btn" id="btnNext" disabled>⏭</button>
+                    <button class="control-btn" id="btnPrev" disabled title="Предыдущая">⏮</button>
+                    <button class="control-btn play" id="btnPlay" disabled title="Воспроизвести">▶</button>
+                    <button class="control-btn" id="btnPause" disabled title="Пауза">⏸</button>
+                    <button class="control-btn" id="btnStop" disabled title="Стоп">⏹</button>
+                    <button class="control-btn" id="btnNext" disabled title="Следующая">⏭</button>
                 </div>
                 
                 <!-- Settings -->
@@ -176,7 +177,10 @@
                     <button class="btn btn-primary btn-large" id="btnExport" disabled>
                         💾 Экспорт в MP3
                     </button>
-                    <span class="export-status" id="exportStatus"></span>
+                    <span class="export-status" id="exportStatus">Экспорт недоступен</span>
+                </div>
+                <div class="info-box" style="margin-top: 16px;">
+                    ⏳ <strong>Экспорт:</strong> Синтезирует и склеивает все реплики в один файл. Для 80 реплик это займёт 2–4 минуты. Не закрывайте вкладку.
                 </div>
             </section>
 
@@ -227,13 +231,13 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>Настройки</h2>
-                    <button class="close-btn" onclick="toggleSettings()"></button>
+                    <button class="close-btn" onclick="toggleSettings()">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
                         <label>URL прокси (для разработчиков)</label>
                         <input type="text" id="proxyUrl" value="https://yandex-tts-proxy.kozlov-stereo.workers.dev">
-                        <small>По умолчанию используется наш прокси</small>
+                        <small>По умолчанию используется наш прокси на Cloudflare</small>
                     </div>
                     <div class="form-group">
                         <label>Статус подключения</label>

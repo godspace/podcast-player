@@ -134,6 +134,8 @@ function handleTextParse() {
     try {
         loadPodcast(JSON.parse(text));
         showLoadedState('JSON из текста');
+        // Запускаем предварительную генерацию
+        preGeneratePodcast();
     } catch (err) {
         toast('Ошибка JSON: ' + err.message);
     }
@@ -145,6 +147,8 @@ function readFile(file) {
         try {
             loadPodcast(JSON.parse(e.target.result));
             showLoadedState(file.name);
+            // Запускаем предварительную генерацию
+            preGeneratePodcast();
         } catch (err) {
             toast('Ошибка JSON: ' + err.message);
         }
@@ -161,6 +165,7 @@ function showLoadedState(sourceName) {
 
 function resetUploadState() {
     stopPlayback();
+    S.preGenerating = false;
     S.podcast = null;
     S.lines = [];
     S.idx = -1;
@@ -178,6 +183,58 @@ function resetUploadState() {
     $('curAvatar').className = 'avatar speaker-1';
     $('statusBar').textContent = 'Готов к работе';
     $('statusBar').className = 'status';
+}
+
+// ============ PRE-GENERATION ============
+async function preGeneratePodcast() {
+    if (!S.lines.length) return;
+    
+    S.preGenerating = true;
+    setStatus('Предварительная генерация: подготовка...', 'success');
+    
+    try {
+        const blobs = [];
+        
+        for (let i = 0; i < S.lines.length; i++) {
+            if (!S.preGenerating) {
+                setStatus('Предварительная генерация отменена', 'error');
+                return;
+            }
+            
+            setStatus(`Предварительная генерация: реплика ${i + 1}/${S.lines.length}`, 'success');
+            $('exportStatus').textContent = `Генерация: ${i + 1}/${S.lines.length}`;
+            
+            const blob = await ensureAudio(i);
+            blobs.push(blob);
+            
+            $('progressBar').style.width = ((i + 1) / S.lines.length * 100) + '%';
+        }
+        
+        // Сохраняем в библиотеку
+        const episodeId = `ep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const episode = {
+            id: episodeId,
+            title: S.podcast.title || 'Без названия',
+            blobs: blobs, // Массив blob'ов по репликам
+            mergedBlob: null, // Будет создан при экспорте
+            durationSec: 0,
+            createdAt: Date.now(),
+            podcastData: S.podcast
+        };
+        
+        await saveEpisode(episode);
+        await loadLibrary();
+        
+        setStatus(`✅ Предварительная генерация завершена: ${S.lines.length} реплик`, 'success');
+        $('exportStatus').textContent = '✅ Готов к воспроизведению и экспорту';
+        toast('📚 Подкаст сохранён в библиотеку');
+        
+    } catch (err) {
+        setStatus('Ошибка предварительной генерации: ' + err.message, 'error');
+        toast('Ошибка генерации: ' + err.message);
+    } finally {
+        S.preGenerating = false;
+    }
 }
 
 // ============ PODCAST LOADING ============
@@ -299,7 +356,10 @@ function renderTranscript() {
 let lastStepTime = 0;
 
 function play() {
-    if (S.exporting) { toast('Дождитесь окончания экспорта'); return; }
+    if (S.exporting || S.preGenerating) { 
+        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта'); 
+        return; 
+    }
     if (!S.lines.length) { toast('Сначала загрузите сценарий'); return; }
     if (S.paused) { S.audioEl.play(); S.paused = false; setStatus('Продолжение', 'success'); return; }
     if (S.playing) return;
@@ -324,7 +384,7 @@ function stopPlayback() {
     S.paused = false;
     S.audioEl.pause();
     S.audioEl.currentTime = 0;
-    if (!S.exporting) setStatus('Остановлено');
+    if (!S.exporting && !S.preGenerating) setStatus('Остановлено');
     updateProgress();
 }
 
@@ -342,7 +402,10 @@ function step(d) {
 }
 
 function jumpTo(i) {
-    if (S.exporting) { toast('Дождитесь окончания экспорта'); return; }
+    if (S.exporting || S.preGenerating) { 
+        toast(S.preGenerating ? 'Идёт предварительная генерация...' : 'Дождитесь окончания экспорта'); 
+        return; 
+    }
     if (i < 0 || i >= S.lines.length) return;
     S.audioEl.pause();
     S.idx = i;
@@ -369,14 +432,13 @@ async function playCurrent() {
     const line = S.lines[S.idx];
 
     try {
-        setStatus('Синтез: Голос ' + (getSpkIndex(line.speaker) + 1) + '…');
+        setStatus('Говорит: Голос ' + (getSpkIndex(line.speaker) + 1), 'success');
         const blob = await ensureAudio(S.idx);
         if (S.stopRequested) return;
 
         S.audioEl.src = URL.createObjectURL(blob);
         S.audioEl.volume = parseFloat($('volSlider').value);
         await S.audioEl.play();
-        setStatus('Говорит: Голос ' + (getSpkIndex(line.speaker) + 1), 'success');
 
         S.audioEl.onended = async () => {
             if (S.stopRequested) return;
@@ -385,7 +447,7 @@ async function playCurrent() {
         };
     } catch (err) {
         setStatus('Ошибка: ' + err.message, 'error');
-        toast('Ошибка синтеза: ' + err.message);
+        toast('Ошибка воспроизведения: ' + err.message);
         S.playing = false;
     }
 }
@@ -431,7 +493,7 @@ async function synthesize(text, voice, emotion, speed) {
     return await r.blob();
 }
 
-// ============ UI UPDATES (ИСПРАВЛЕННАЯ ВЕРСИЯ) ============
+// ============ UI UPDATES ============
 function displayLine() {
     if (S.idx < 0 || S.idx >= S.lines.length) return;
     
@@ -544,7 +606,7 @@ function scrollToSection(id) {
 }
 
 function handleProgressClick(e) {
-    if (!S.lines.length || S.exporting) return;
+    if (!S.lines.length || S.exporting || S.preGenerating) return;
     const r = $('progressBg').getBoundingClientRect();
     const p = (e.clientX - r.left) / r.width;
     jumpTo(Math.min(Math.floor(p * S.lines.length), S.lines.length - 1));
@@ -571,7 +633,7 @@ function renderLibrary(episodes) {
     if (!container) return;
 
     if (episodes.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>Библиотека пуста. Сгенерируйте первый подкаст!</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>Библиотека пуста. Загрузите первый подкаст!</p></div>';
         return;
     }
 
@@ -580,8 +642,8 @@ function renderLibrary(episodes) {
             <div class="library-info">
                 <div class="library-title">${ep.title}</div>
                 <div class="library-meta">
-                    <span>${formatDuration(ep.durationSec)}</span>
-                    <span>${formatBytes(ep.blob.size)}</span>
+                    <span>${ep.blobs ? ep.blobs.length + ' реплик' : '—'}</span>
+                    <span>${formatBytes(ep.mergedBlob ? ep.mergedBlob.size : 0)}</span>
                     <span>${new Date(ep.createdAt).toLocaleDateString('ru-RU')}</span>
                 </div>
             </div>
@@ -595,12 +657,14 @@ function renderLibrary(episodes) {
 }
 
 function formatDuration(sec) {
+    if (!sec) return '0:00';
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function formatBytes(bytes) {
+    if (!bytes) return '0 Б';
     if (bytes < 1024) return bytes + ' Б';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
     return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
@@ -616,8 +680,15 @@ async function playFromLibrary(id) {
     loadPodcast(episode.podcastData);
     showLoadedState(`Библиотека: ${episode.title}`);
 
+    // Кэшируем ВСЕ blob'ы из библиотеки
+    if (episode.blobs && Array.isArray(episode.blobs)) {
+        episode.blobs.forEach((blob, i) => {
+            S.audioCache[i] = blob;
+        });
+    }
+
     S.idx = 0;
-    S.audioCache[0] = episode.blob;
+    displayLine(); // Обновляем транскрипт сразу
     play();
 
     toast(`▶ Воспроизведение: ${episode.title}`);
@@ -630,8 +701,13 @@ async function downloadFromLibrary(id) {
         return;
     }
 
+    if (!episode.mergedBlob) {
+        toast('MP3 ещё не создан. Нажмите "Экспорт в MP3" после открытия подкаста.');
+        return;
+    }
+
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(episode.blob);
+    a.href = URL.createObjectURL(episode.mergedBlob);
     a.download = episode.title + '.mp3';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
@@ -647,7 +723,7 @@ async function deleteFromLibrary(id) {
     toast('🗑 Подкаст удалён из библиотеки');
 }
 
-// ============ MP3 EXPORT WITH AUTO-SAVE ============
+// ============ MP3 EXPORT ============
 async function loadLame() {
     if (window.lamejs && window.lamejs.Mp3Encoder) return true;
     const cdns = [
@@ -705,12 +781,12 @@ function pcmToWavBlob(pcmBuffer, sampleRate) {
 }
 
 async function exportMp3() {
-    if (!S.lines.length || S.exporting) return;
+    if (!S.lines.length || S.exporting || S.preGenerating) return;
     stopPlayback();
     S.exporting = true;
     const btn = $('btnExport');
     btn.disabled = true;
-    $('exportStatus').textContent = 'Подготовка...';
+    $('exportStatus').textContent = 'Склейка MP3...';
 
     const haveLame = await loadLame();
     if (!haveLame) toast('MP3-кодер недоступен — будет экспортирован WAV');
@@ -735,14 +811,13 @@ async function exportMp3() {
 
     try {
         for (let i = 0; i < S.lines.length; i++) {
-            setStatus(`Экспорт: реплика ${i + 1}/${S.lines.length} — синтез`);
-            $('exportStatus').textContent = `Реплика ${i + 1} / ${S.lines.length}`;
+            setStatus(`Экспорт: реплика ${i + 1}/${S.lines.length}`, 'success');
+            $('exportStatus').textContent = `Склейка: ${i + 1}/${S.lines.length}`;
 
             const blob = await ensureAudio(i);
             const ab = await blob.arrayBuffer();
             const audioBuf = await ctx.decodeAudioData(ab);
 
-            setStatus(`Экспорт: реплика ${i + 1}/${S.lines.length} — кодирование`);
             pushPcm(floatToInt16(audioBuf.getChannelData(0)));
 
             const pauseMs = S.lines[i].pause_after_ms ?? 400;
@@ -779,24 +854,22 @@ async function exportMp3() {
         setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 
         const mb = (outBlob.size / 1048576).toFixed(1);
-        setStatus(`Экспорт завершён: ${fname} (${mb} МБ)`, 'ok');
-        $('exportStatus').textContent = `✅ Сохранено: ${fname} (${mb} МБ)`;
-        toast('✅ Подкаст сохранён: ' + fname);
+        setStatus(`✅ Экспорт завершён: ${fname} (${mb} МБ)`, 'success');
+        $('exportStatus').textContent = `✅ ${fname} (${mb} МБ)`;
+        toast('✅ Файл скачан: ' + fname);
 
-        // Автоматически сохраняем в библиотеку
-        const episodeId = `ep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const episode = {
-            id: episodeId,
-            title: S.podcast.title || 'Без названия',
-            blob: outBlob,
-            durationSec: Math.round(pcmChunks.reduce((s, c) => s + c.length, 0) / sr),
-            createdAt: Date.now(),
-            podcastData: S.podcast
-        };
-
-        await saveEpisode(episode);
-        await loadLibrary();
-        toast('📚 Добавлено в библиотеку');
+        // Обновляем запись в библиотеке: добавляем mergedBlob
+        const episodes = await getAllEpisodes();
+        const currentEpisode = episodes.find(ep => 
+            ep.podcastData && ep.podcastData.title === S.podcast.title
+        );
+        if (currentEpisode) {
+            currentEpisode.mergedBlob = outBlob;
+            currentEpisode.durationSec = Math.round(pcmChunks.reduce((s, c) => s + c.length, 0) / sr);
+            await saveEpisode(currentEpisode);
+            await loadLibrary();
+            toast('📚 Библиотека обновлена');
+        }
 
     } catch (err) {
         setStatus('Ошибка экспорта: ' + err.message, 'error');

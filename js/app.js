@@ -637,23 +637,37 @@ function renderLibrary(episodes) {
         return;
     }
 
-    container.innerHTML = episodes.map(ep => `
-        <div class="library-item" data-id="${ep.id}">
-            <div class="library-info">
-                <div class="library-title">${ep.title}</div>
-                <div class="library-meta">
-                    <span>${ep.blobs ? ep.blobs.length + ' реплик' : '—'}</span>
-                    <span>${formatBytes(ep.mergedBlob ? ep.mergedBlob.size : 0)}</span>
-                    <span>${new Date(ep.createdAt).toLocaleDateString('ru-RU')}</span>
+    container.innerHTML = episodes.map(ep => {
+        // Считаем суммарный размер всех реплик
+        let totalSize = 0;
+        if (ep.mergedBlob) {
+            totalSize = ep.mergedBlob.size;
+        } else if (ep.blobs && Array.isArray(ep.blobs)) {
+            totalSize = ep.blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
+        }
+
+        // Считаем длительность (если есть)
+        const duration = ep.durationSec ? formatDuration(ep.durationSec) : '~';
+
+        return `
+            <div class="library-item" data-id="${ep.id}">
+                <div class="library-info">
+                    <div class="library-title">${ep.title}</div>
+                    <div class="library-meta">
+                        <span>${ep.blobs ? ep.blobs.length + ' реплик' : '—'}</span>
+                        <span>${formatBytes(totalSize)}</span>
+                        <span>${duration}</span>
+                        <span>${new Date(ep.createdAt).toLocaleDateString('ru-RU')}</span>
+                    </div>
+                </div>
+                <div class="library-actions">
+                    <button class="btn btn-small btn-primary" onclick="playFromLibrary('${ep.id}')">▶ Слушать</button>
+                    <button class="btn btn-small btn-secondary" onclick="downloadFromLibrary('${ep.id}')">💾 Скачать</button>
+                    <button class="btn btn-small btn-secondary" onclick="deleteFromLibrary('${ep.id}')">🗑 Удалить</button>
                 </div>
             </div>
-            <div class="library-actions">
-                <button class="btn btn-small btn-primary" onclick="playFromLibrary('${ep.id}')">▶ Слушать</button>
-                <button class="btn btn-small btn-secondary" onclick="downloadFromLibrary('${ep.id}')">💾 Скачать</button>
-                <button class="btn btn-small btn-secondary" onclick="deleteFromLibrary('${ep.id}')">🗑 Удалить</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function formatDuration(sec) {

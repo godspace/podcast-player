@@ -3,13 +3,7 @@ const CONFIG = {
   // Voices
   YANDEX_VOICES: [
       {id:'filipp',  name:'Filipp (муж)'},
-      {id:'jane',    name:'Jane (жен)'},
-      {id:'ermil',   name:'Ermil (муж)'},
-      {id:'zahar',   name:'Zahar (муж)'},
-      {id:'madirus', name:'Madirus (муж)'},
-      {id:'oksana',  name:'Oksana (жен)'},
-      {id:'alena',   name:'Alena (жен)'},
-      {id:'omazh',   name:'Omazh (жен)'}
+      {id:'jane',    name:'Jane (жен)'}
   ],
   
   DEFAULT_VOICES: ['filipp', 'jane'],
